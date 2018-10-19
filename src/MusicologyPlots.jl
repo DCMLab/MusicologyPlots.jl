@@ -14,7 +14,7 @@ function pianoroll(notes; color=nothing, width=800, height=400)
     minp = minimum(notedf[:pitch])
     if color==nothing
         notedf |>
-            @vlplot(mark=:rect,
+            @vlplot(mark={typ=:rect,clip=true},
                     x = :onset,
                     x2 = :offset,
                     y = {
@@ -27,7 +27,7 @@ function pianoroll(notes; color=nothing, width=800, height=400)
                     width=width, height=height)
     else
         notedf |>
-            @vlplot(mark=:rect,
+            @vlplot(mark={typ=:rect,clip=true},
                     x = :onset,
                     x2 = :offset,
                     y = {
@@ -45,7 +45,7 @@ end
 flatten(v) = vcat(v...)
 
 function plotpolygrams(notes, polys;
-                       margin=2, width=800, height=400,
+                       margin=1, width=800, height=400,
                        start=nothing, stop=nothing)
     #lower = minimum(onset(pgram[1][1]) for pgram in polygrams)
     #upper = maximum(maximum(map(offset, pgram[end])) for pgram in polygrams)
@@ -55,31 +55,32 @@ function plotpolygrams(notes, polys;
     polynames = map(1:length(flattened)) do i
         fill(string("poly ", i), length(flattened[i]))
     end
-    polynotes = vcat(notes, flatten(flattened))
-    polydf = DataFrame(pitch=map(note -> convert(Int, pitch(note)), polynotes),
-                       onset=map(onset, polynotes),
-                       offset=map(offset, polynotes),
+    polynotes = flatten(flattened)
+    allnotes = vcat(notes, polynotes)
+    polydf = DataFrame(pitch=map(note -> convert(Int, pitch(note)), allnotes),
+                       onset=map(onset, allnotes),
+                       offset=map(offset, allnotes),
                        name=vcat(fill("notes", length(notes)), flatten(polynames)))
 
     maxp = maximum(polydf[:pitch])
     minp = minimum(polydf[:pitch])
     if start == nothing
-        start = minimum(polydf[:onset])
+        start = minimum(map(onset,polynotes)) - margin
     end
     if stop == nothing
-        stop = maximum(polydf[:offset])
+        stop = maximum(map(onset,polynotes)) + margin
     end
     dom = [start, stop]
 
     polydf |>
-        @vlplot(mark=:rect,
+        @vlplot(mark={typ=:rect,clip=true},
                 x={field=:onset, scale={domain=dom}},
                 x2=:offset,
                 y={field=:pitch, typ="ordinal", scale={domain=collect(maxp:-1:minp)}},
                 color={field=:name, scale={scheme="tableau20"}}, tooltip=:pitch,
-                selection={grid={typ=:interval, bind=:scales}},
+                #selection={grid={typ=:interval, bind=:scales}},
                 width=width, height=height)
-    
+
     # fg = @vlplot(mark=:rect,
     #              transform=[{filter="datum.name != 'notes'"}],
     #              x={field=:onset, scale={domain=dom}},
@@ -100,6 +101,8 @@ function plotpolygrams(notes, polys;
 
     # polydf |> (bg + fg)
 end
+
+include("widgets.jl")
 
 # using Plots
 
@@ -166,7 +169,7 @@ end
 #     label = get(plotattributes, :label, "notes")
 #     hovers = get(plotattributes, :hover,
 #                  map(n -> "$(pitch(n)): $(onset(n)) - $(offset(n))", notes))
-    
+
 #     @series begin
 #         x := coords(xseg)
 #         y := coords(yseg)
@@ -227,7 +230,7 @@ end
 #     inrange(note) = onset(note) > lower-margin && offset(note) < upper+margin
 #     plt = pianoroll(filter(inrange, notes), label="notes", kwargs...)
 #     #plt = pianoroll(notes, label="notes", kwargs...)
-    
+
 #     for (i, poly) in enumerate(polygrams)
 #         polynotes = vcat(poly...)
 #         plt = pianoroll!(polynotes; label=string("polygram ", i), kwargs...)

@@ -1,128 +1,228 @@
-function pianoroll(id, notes, highlights) {
-    // if (typeof notes === "string") {
-    //     notes = JSON.parse(notes);
-    // }
-    // if (typeof highlights === "string") {
-    //     highlights = JSON.parse(highlights);
-    // }
+function pianoroll(id, d3, notes, highlights, allowselect) {
     var pr = document.getElementById(id);
-    var d3 = pr.d3;
-    // var notes = pr.notes;
-    // var highlights = pr.highlights;
+    var hovered = null;
+    var selected = new Set();
     
     aspectRatio = 0.5;
     var margin = {top: 20, right: 30, bottom: 30, left: 40},
-        width = pr.getBoundingClientRect().width,
-        height = width*aspectRatio,
-        iwidth = width - margin.right - margin.left,
-        iheight = height - margin.top - margin.bottom;
-    // var noteheight = 10;
-
-    console.log("scales");
+        width, height, iwidth, iheight;
     
-    var xScaleOrig = d3.scaleLinear()
-        .range([0,iwidth])
+    //console.log("scales");
+    
+    var xScale = d3.scaleLinear()
         .domain([d3.min(notes, n => n.onset),
                  d3.max(notes, n => n.offset)]);
-    var xScale = xScaleOrig;
+    var x = xScale;
     
     var pitchext = d3.extent(notes, n => n.pitch);
-    var yScale = d3.scaleBand()
-        .rangeRound([iheight, 0]) //bottom?
+    var y = d3.scaleBand()
         .padding(.1)
         .domain(d3.range(pitchext[0], pitchext[1]+1));
 
     var hlScale = d3.scaleOrdinal(d3.schemeCategory10);
 
-    console.log("canvas");
+    //console.log("canvas");
     d3.select(pr).select("canvas").remove();
     var canvas = d3.select(pr).append("canvas")
-        .attr("width", iwidth)
-        .attr("height", iheight)
         .style("transform", "translate("+margin.left+"px,"+margin.top+"px)")
         .style("position", "absolute");
-    
-    console.log("svg");
-    d3.select(pr).select("svg").remove();
-    var svg = d3.select(pr).append("svg")
-        .attr("width", width).attr("height", height)
-        //.style("position", "absolute")
-      .append("g")
-        .attr("transform", "translate("+margin.left+","+margin.top+")");
-    var gX = svg.append("g")
-        .attr("transform", "translate(0,"+iheight+")")
-        .call(d3.axisBottom(xScale));
-    var gY = svg.append("g")
-        .call(d3.axisLeft(yScale));
         
-    //var noteSel = custom.selectAll('custom.rect');
-    var context = canvas.node().getContext('2d');
+    var context = canvas.node().getContext("2d");
+    
+    //console.log("svg");
+    d3.select(pr).select("svg").remove();
+    var svg = d3.select(pr).append("svg");
+    var gX, gY;
 
+    var currentTrans = d3.zoomIdentity;
+    var zoom = d3.zoom()
+        .on("zoom", function () {
+            currentTrans = d3.event.transform;
+            zoompr();
+        });
+    canvas.call(zoom);
+    
+    function resize() {
+        width = pr.getBoundingClientRect().width,
+        height = width*aspectRatio,
+        iwidth = width - margin.right - margin.left,
+        iheight = height - margin.top - margin.bottom;
+
+        xScale.range([0,iwidth]);
+        y.rangeRound([iheight, 0]);
+        canvas.attr("width", iwidth).attr("height", iheight);
+        svg.select("g").remove();
+        var g = svg.attr("width", width).attr("height", height)
+          .append("g")
+            .attr("transform", "translate("+margin.left+","+margin.top+")");
+        gX = g.append("g")
+            .attr("transform", "translate(0,"+iheight+")")
+            .call(d3.axisBottom(x));
+        gY = g.append("g")
+            .call(d3.axisLeft(y));
+    }
+    d3.select(window).on("resize."+id, function() {
+        resize();
+        zoompr();
+    });
+    
+    function cx(datax) {
+        return Math.round(x(datax));
+    }
+
+    function cy(datay) {
+        return Math.round(y(datay));
+    }
+    
     function drawNote(note) {
-        context.fillRect(xScale(note.onset), yScale(note.pitch),
-                         xScale(note.offset)-xScale(note.onset), yScale.bandwidth());
+        context.fillRect(cx(note.onset), cy(note.pitch),
+                         cx(note.offset)-cx(note.onset),
+                         Math.round(y.bandwidth()));
+    }
+
+    function strokeNote(note) {
+        context.strokeRect(cx(note.onset)+0.5, cy(note.pitch)+0.5,
+                           cx(note.offset)-cx(note.onset)-1,
+                           Math.round(y.bandwidth()-1));
     }
     
     function drawpr() {
-        console.log("drawpr");
+        //console.log("drawpr");
         context.clearRect(0, 0, width, height);
 
-        context.fillStyle = "grey";
+        context.fillStyle = "lightgrey";
         notes.forEach(drawNote);
 
         highlights.forEach(function(highlight, i) {
             context.fillStyle = hlScale(i);
             highlight.forEach(drawNote);
         });
+
+        context.strokeStyle = "black";
+        context.setLineDash([]);
+        selected.forEach(i => strokeNote(notes[i]));
+
+        if (hovered !== null) {
+            context.setLineDash([10,10]);
+            strokeNote(hovered);
+        }
     }
-
-    // var quadTree = d3.geom.quadtree(notes);
-    
-    function onClick() {
-        var mouse = d3.mouse(this);
-
-        var xcl = xScale.invert(mouse[0]);
-        var ycl = yScale.invert(mouse[1]);
-
-        var closest = quadTree.find([xcl, ycl]);
-        console.log("clicked on "+closest);
-    }
-    //canvas.on("click", onClick);
 
     function zoompr() {
-        console.log(d3.event.transform);
-        
-        xScale = d3.event.transform.rescaleX(xScaleOrig);
-        gX.call(d3.axisBottom(xScale));
+        x = currentTrans.rescaleX(xScale);
+        gX.call(d3.axisBottom(x));
         drawpr();
     }
-    
-    var zoomBehaviour = d3.zoom()
-        //.x(xScale)
-        //.scaleExtent([0.1,10])
-        .on("zoom", zoompr);
-    canvas.call(zoomBehaviour);
-    
+
+    function zoomtohls() {
+        var on = d3.min(highlights, hl => d3.min(hl, n => n.onset));
+        var off = d3.max(highlights, hl => d3.max(hl, n => n.offset));
+        
+        if (on !== undefined && off !== undefined) {
+            var trans = d3.zoomIdentity
+                .scale(iwidth/xScale(off-on+2))
+                .translate(-xScale(on-1));
+            canvas.call(zoom.transform, trans);
+        }
+    }
+
+    // selection
+    if(allowselect) {
+        
+        canvas.on("mousemove", function() {
+            var mouse = d3.mouse(this);
+            var mx = mouse[0],
+                my = mouse[1];
+            
+            hovered = null;
+            var nearest = null, mindist = Infinity;
+            notes.forEach(function(note) {
+                var xon  = x(note.onset),
+                    xoff = x(note.offset),
+                    ytop = y(note.pitch),
+                    ybot = ytop+y.bandwidth();
+                if (mx >= xon && mx <= xoff && my >= ytop && my <= ybot) {
+                    hovered = note;
+                } else {
+                    var xdist = Math.max(0, xon-mx, mx-xoff),
+                        ydist = Math.max(0, ytop-my, my-ybot); 
+                    var dist = Math.sqrt(xdist*xdist + ydist*ydist);
+                    if (dist < 10 && dist < mindist) {
+                        nearest = note;
+                        mindist = dist;
+                    }
+                }
+            });
+            if (hovered === null) {
+                hovered = nearest;
+            }
+            
+            drawpr();
+        });
+
+        canvas.on("mouseout", function() {
+            hovered = null;
+            drawpr();
+        });
+        
+        canvas.on("click", function() {
+            if (hovered === null) {
+                selected.clear();
+            } else {
+                var sel = notes.indexOf(hovered);
+                console.log("clicked note: "+sel);
+                if (selected.has(sel)) {
+                    console.log("removing note "+sel);
+                    selected.delete(sel);
+                } else {
+                    console.log("adding note "+sel);
+                    selected.add(sel);
+                }
+            }
+            drawpr();
+            if (typeof pr.updateSelectedOut === "function") {
+                pr.updateSelectedOut(selected);
+            }
+        });
+    }
+
+    resize();
+    zoomtohls();
     drawpr();
 
     pr.updateNotes = function (newnotes) {
         notes = newnotes;
         highlights = [];
 
-        xScaleOrig.domain([d3.min(notes, n => n.onset),
+        xScale.domain([d3.min(notes, n => n.onset),
                            d3.max(notes, n => n.offset)]);
-        xScale = xScaleOrig;
-        gX.call(d3.axisBottom(xScale));
+        x = xScale;
+        gX.call(d3.axisBottom(x));
         
         var pitchext = d3.extent(notes, n => n.pitch);
-        yScale.domain(d3.range(pitchext[0], pitchext[1]+1));
-        gY.call(d3.axisLeft(yScale));
+        y.domain(d3.range(pitchext[0], pitchext[1]+1));
+        gY.call(d3.axisLeft(y));
 
+        canvas.call(zoom.transform, d3.zoomIdentity);
+        
         drawpr();
     };
 
-    pr.updateHighlights = function (newhls) {
+    pr.updateHighlights = function (newhls, zoomto) {
         highlights = newhls;
+        if (zoomto) {
+            zoomtohls();
+        }
+        drawpr();
+    };
+
+    pr.clearSel = function () {
+        selected.clear();
+        drawpr();
+    };
+
+    pr.updateSelectedIn = function (newsel) {
+        selected = newsel;
         drawpr();
     };
 }

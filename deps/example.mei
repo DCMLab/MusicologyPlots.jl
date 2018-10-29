@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mei xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.music-encoding.org/ns/mei" meiversion="3.0.0">
+  <meiHead>
+  </meiHead>
+  <music>
+    <mdiv>
+      <score>
+        
+      </score>
+    </mdiv>
+  </music>
+</mei>

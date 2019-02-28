@@ -1,7 +1,7 @@
-using WebIO, Widgets, JSExpr, Interact
+using WebIO, Widgets, JSExpr, Interact, AssetRegistry
 using DigitalMusicology
 
-export pianorollwdg, clear!
+export pianorollwdg, clear!, veroviowdg
 
 notetodict(note::TimedNote, id=0) =
     Dict(:onset => onset(note),
@@ -14,6 +14,8 @@ dicttonote(dict) = TimedNote()
 testnotes = [TimedNote(midi(0),0//1,1//1),
              TimedNote(midi(2),1//1,2//1),
              TimedNote(midi(4),2//1,3//1)]
+
+jsdep(path...) = joinpath(@__DIR__, "..", "deps", path...)
 
 """
     pianorollwdg(notes; highlights=[])
@@ -50,28 +52,21 @@ function pianorollwdg(notes; highlights=[], allowselect=false, zoomtohl=true)
     end
 
     jclear = Observable(scp, "jclear", nothing)
-    
-    #setobservable!(scp, "oselected", oselected)
 
     importjs = @js function (d3)
         @var pr = document.getElementById($id)
         pianoroll($id, d3, $jnotes[], $jhighlights[], $allowselect)
         pr.updateSelectedOut = function (selected)
-            console.log(selected)
             $jselected[] = Array.from(selected)
         end
     end
     
     onimport(scp, importjs)
 
-    #onjs(scp, "onotes", @js x -> console.log("Alloooo"))
-
     onjs(scp["jnotes"], @js ns -> document.getElementById($id).updateNotes(ns))
     onjs(scp["jhighlights"],
          @js hls -> document.getElementById($id).updateHighlights(hls, $zoomtohl))
     onjs(scp["jclear"], @js clr -> document.getElementById($id).clearSel())
-
-    #onotes[] = notes
 
     lay(w) = node(:div,
         scope(w),
@@ -85,21 +80,61 @@ end
 
 clear!(pr::Widget{:pianoroll}) = pr[:clear][] = nothing
 
-# TODO
-function veroviowdg(input)
+"""
+    veroviowdg(input; highlights=[], allowselect=false)
+
+Takes as `input` a string in a format understood by verovio (e.g., MusicXML or MEI).
+Returns a widget that renders the input using verovio and allows to
+control the input as well as highlighted and selected notes using
+the `:input`, `:highlights`, and `:selected` kewords.
+Both highlights and selections use note ids,
+so it makes sense to first set the `xml:id` attributes of notes in the input XML structure,
+then feed the XML to this function and use the assigned note ids
+to identify notes in the verovio SVG with notes used elsewhere.
+While `:selection` is a list of note ids, `:highlights` is a list of note groups,
+where each group is displayed in a different color.
+"""
+function veroviowdg(input; highlights=[], allowselect=false)
     # using the fix for emscripten-based dependencies:
-    scp = Scope(imports=["https://www.verovio.org/javascript/develop/verovio-toolkit.js"],
+    scp = Scope(imports=[jsdep("verovio-toolkit.js"),
+                         jsdep("d3.v4.min.js"),
+                         jsdep("veroviowdg.js")],
                 systemjs_options=Dict(
                     "meta" =>
-                    Dict("https://www.verovio.org/javascript/develop/verovio-toolkit.js" =>
+                    # don't hardcode hash, lookup in AssetRegistry if possible
+                    Dict(AssetRegistry.getkey(jsdep("verovio-toolkit.js")) =>
                          Dict("format" => "global"))))
     id = string("verovioScore", rand(UInt))
 
-    onimport(scp, js"""function(vrv) {
-        score = document.getElementById($id);
-        score.verovio = vrv;
-    }""")
+    # observables
+    oinput = Observable(scp, "input", input)
+    ohighlights = Observable(scp, "highlights", highlights)
+    oselected = Observable(scp, "selected", [])
     
+    # js setup
+    onimport(scp, @js function(vrv, d3, wdg)
+                 score = document.getElementById($id)
+                 @var tk = @new vrv.verovio.toolkit()
+                 console.log(wdg);
+                 veroviowdg($id, tk, d3, $input, $highlights, $allowselect)
+                 console.log("test2");
+                 score.updateSelectedOut = function (selected)
+                     $oselected[] = Array.from(selected)
+                 end
+                 score.updateHighlightsOut = function (highlights)
+                     $ohighlights[] = Array.from(highlights);
+                 end
+             end)
+
+    # handlers
+    onjs(scp["input"], @js ns -> document.getElementById($id).updateInput(ns))
+    onjs(scp["highlights"], @js hls -> document.getElementById($id).updateHighlightsIn(hls))
+    onjs(scp["selected"], @js sel -> document.getElementById($id).updateSelectedIn(sel))
+
+    # layout and widget
     lay(w) = node(:div, scope(w), id=id)
-    wdg = Widget([]; scope=scp, layout=lay)
+    wdg = Widget{:verovio}([:input => oinput,
+                            :highlights => ohighlights,
+                            :selected => oselected];
+                           scope=scp, layout=lay)
 end

@@ -2,6 +2,7 @@ name = "MusicologyPlots"
 uuid = "c9d89ec8-a6c4-11e8-1629-537f3e81f650"
 
 [deps]
+AssetRegistry = "bf4720bc-e11a-5d0c-854e-bdca1663c893"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DigitalMusicology = "2c2a18ac-9fc9-11e8-3acf-35f06862b736"
 Interact = "c601a237-2ae4-5e1e-952c-7a85b0c7eef1"

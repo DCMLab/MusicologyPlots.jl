@@ -87,12 +87,18 @@ Takes as `input` a string in a format understood by verovio (e.g., MusicXML or M
 Returns a widget that renders the input using verovio and allows to
 control the input as well as highlighted and selected notes using
 the `:input`, `:highlights`, and `:selected` kewords.
+
 Both highlights and selections use note ids,
 so it makes sense to first set the `xml:id` attributes of notes in the input XML structure,
 then feed the XML to this function and use the assigned note ids
 to identify notes in the verovio SVG with notes used elsewhere.
 While `:selection` is a list of note ids, `:highlights` is a list of note groups,
 where each group is displayed in a different color.
+
+The widget includes page controls, but the visible page cannot be directly controlled from Julia.
+Instead, one can force the widget to show a specific note using `jumpto!(wdg, "note-id")`.
+
+The selection can be cleared using `clear!(wdg)`.
 """
 function veroviowdg(input; highlights=[], allowselect=false)
     # using the fix for emscripten-based dependencies:

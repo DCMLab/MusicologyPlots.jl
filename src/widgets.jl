@@ -1,7 +1,7 @@
 using WebIO, Widgets, JSExpr, Interact, AssetRegistry
 using DigitalMusicology
 
-export pianorollwdg, clear!, veroviowdg
+export pianorollwdg, veroviowdg, clear!, jumptonote!
 
 notetodict(note::TimedNote, id=0) =
     Dict(:onset => onset(note),
@@ -110,6 +110,7 @@ function veroviowdg(input; highlights=[], allowselect=false)
     oinput = Observable(scp, "input", input)
     ohighlights = Observable(scp, "highlights", highlights)
     oselected = Observable(scp, "selected", [])
+    ojumpto = Observable(scp, "jumpto", "")
     
     # js setup
     onimport(scp, @js function(vrv, d3, wdg)
@@ -130,11 +131,16 @@ function veroviowdg(input; highlights=[], allowselect=false)
     onjs(scp["input"], @js ns -> document.getElementById($id).updateInput(ns))
     onjs(scp["highlights"], @js hls -> document.getElementById($id).updateHighlightsIn(hls))
     onjs(scp["selected"], @js sel -> document.getElementById($id).updateSelectedIn(sel))
+    onjs(scp["jumpto"], @js note -> document.getElementById($id).jumpToNote(note))
 
     # layout and widget
     lay(w) = node(:div, scope(w), id=id)
     wdg = Widget{:verovio}([:input => oinput,
                             :highlights => ohighlights,
-                            :selected => oselected];
+                            :selected => oselected,
+                            :jumpto => ojumpto];
                            scope=scp, layout=lay)
 end
+
+clear!(vrv::Widget{:verovio}) = vrv[:selected][] = []
+jumptonote!(vrv::Widget{:verovio}, note) = vrv[:jumpto][] = note

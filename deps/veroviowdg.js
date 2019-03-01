@@ -6,14 +6,24 @@ function veroviowdg(id, tk, d3, input, highlights, allowselect) {
 
     var selected = new Set();
 
-    var hlScale = d3.scaleOrdinal(d3.schemeCategory10);
-    var selColor = "firebrick";
+    var vrvOpts = {
+        pageHeight: 1500,
+        adjustPageHeight: true,
+        noFooter: true,
+        noHeader: true
+    };
+    tk.setOptions(vrvOpts);
 
     // render data
-    function render(input) {
-        var svg  = tk.renderData(input, {});
-        score.selectAll("svg").remove();
-        score.html(svg);
+    var hlScale = d3.scaleOrdinal(d3.schemeCategory10);
+    var selColor = "firebrick";
+    
+    function render(page) {
+        var svg  = tk.renderToSVG(page);
+        score.selectAll("div.scorecontainer").remove();
+        score.append("div")
+            .attr("class", "scorecontainer")
+            .html(svg);
 
         if (allowselect) {
             // add glow filter
@@ -81,8 +91,46 @@ function veroviowdg(id, tk, d3, input, highlights, allowselect) {
             score.select("g#"+note).attr("fill", selColor).attr("stroke", selColor);
         });
     }
+
+    // page turning
+    var page = 1;
     
-    render(input);
+    function goToPage(p) {
+        var pc = tk.getPageCount();
+        if (p < 1 || p > pc)
+            return;
+        prev.attr("disabled", p == 1 ? true : null);
+        next.attr("disabled", p == pc ? true : null);
+        page = p;
+        render(page);
+        markNotes(highlights, selected);
+    }
+    
+    // add buttons
+    var prev = score.append("button");
+    var next = score.append("button");
+    prev.html("Previous Page")
+        .attr("disabled", true)
+        .on("click", function () {
+            goToPage(page-1);
+        });
+    next.html("Next Page")
+        .on("click", function () {
+            goToPage(page+1);
+        });
+
+    if (allowselect) {
+        score.append("button")
+            .html("Clear Selection")
+            .on("click", function () {
+                selected = new Set();
+                markNotes(highlights, selected);
+            });
+    }
+
+    // add content
+    tk.loadData(input);
+    render(page);
     markNotes(highlights, selected);
     
     // input and output
@@ -90,9 +138,11 @@ function veroviowdg(id, tk, d3, input, highlights, allowselect) {
         input = newinp;
         highlights = [];
         selected = new Set();
+        page = 1;
         scoreDom.updateHighlightsOut([]);
         scoreDom.updateSelectedOut([]);
-        render(input);
+        tk.loadData(input);
+        render(page);
         //markNotes(highlights, selected);
     };
 
@@ -104,5 +154,10 @@ function veroviowdg(id, tk, d3, input, highlights, allowselect) {
     scoreDom.updateSelectedIn = function (newsel) {
         selected = new Set(newsel);
         markNotes(highlights, selected);
+    };
+
+    scoreDom.jumpToNote = function (note) {
+        var pg = tk.getPageWithElement(note);
+        goToPage(pg);
     };
 }

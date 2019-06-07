@@ -1,4 +1,4 @@
-function veroviowdg(id, tk, d3, input, highlights, allowselect) {
+function veroviowdg(id, tk, d3, input, highlights, allowselect, format) {
     var scoreDom = document.getElementById(id);
     var score = d3.select(scoreDom);
     scoreDom.vrvtk = tk;
@@ -10,7 +10,8 @@ function veroviowdg(id, tk, d3, input, highlights, allowselect) {
         pageHeight: 1500,
         adjustPageHeight: true,
         noFooter: true,
-        noHeader: true
+        noHeader: true,
+        format: format
     };
     tk.setOptions(vrvOpts);
 
@@ -129,7 +130,7 @@ function veroviowdg(id, tk, d3, input, highlights, allowselect) {
     }
 
     // add content
-    tk.loadData(input);
+    tk.loadData(input, format);
     render(page);
     markNotes(highlights, selected);
     

@@ -1,5 +1,6 @@
 using WebIO, Widgets, JSExpr, Interact, AssetRegistry
 using DigitalMusicology
+using LightXML: XMLDocument
 
 export pianorollwdg, veroviowdg, clear!, jumptonote!
 
@@ -11,9 +12,9 @@ notetodict(note::TimedNote, id=0) =
 
 dicttonote(dict) = TimedNote()
 
-testnotes = [TimedNote(midi(0),0//1,1//1),
-             TimedNote(midi(2),1//1,2//1),
-             TimedNote(midi(4),2//1,3//1)]
+testnotes = [TimedNote(midip(0),0//1,1//1),
+             TimedNote(midip(2),1//1,2//1),
+             TimedNote(midip(4),2//1,3//1)]
 
 jsdep(path...) = joinpath(@__DIR__, "..", "deps", path...)
 
@@ -81,7 +82,7 @@ end
 clear!(pr::Widget{:pianoroll}) = pr[:clear][] = nothing
 
 """
-    veroviowdg(input; highlights=[], allowselect=false)
+    veroviowdg(input; highlights=[], allowselect=false, format="xml")
 
 Takes as `input` a string in a format understood by verovio (e.g., MusicXML or MEI).
 Returns a widget that renders the input using verovio and allows to
@@ -100,7 +101,8 @@ Instead, one can force the widget to show a specific note using `jumpto!(wdg, "n
 
 The selection can be cleared using `clear!(wdg)`.
 """
-function veroviowdg(input; highlights=[], allowselect=false)
+veroviowdg(xml::XMLDocument; args...) = veroviowdg(string(xml); args...)
+function veroviowdg(input; highlights=[], allowselect=false, format="xml")
     # using the fix for emscripten-based dependencies:
     scp = Scope(imports=[jsdep("verovio-toolkit.js"),
                          jsdep("d3.v4.min.js"),
@@ -120,10 +122,10 @@ function veroviowdg(input; highlights=[], allowselect=false)
     
     # js setup
     onimport(scp, @js function(vrv, d3, wdg)
-                 score = document.getElementById($id)
+                 @var score = document.getElementById($id)
                  @var tk = @new vrv.verovio.toolkit()
                  console.log(wdg);
-                 veroviowdg($id, tk, d3, $input, $highlights, $allowselect)
+                 veroviowdg($id, tk, d3, $input, $highlights, $allowselect, $format)
                  console.log("test2");
                  score.updateSelectedOut = function (selected)
                      $oselected[] = Array.from(selected)

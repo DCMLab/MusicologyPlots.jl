@@ -126,7 +126,7 @@ function veroviowdg(input; highlights=[], allowselect=false, format="xml")
                  @var tk = @new vrv.verovio.toolkit()
                  console.log(wdg);
                  veroviowdg($id, tk, d3, $input, $highlights, $allowselect, $format)
-                 console.log("test2");
+                 #console.log("test2");
                  score.updateSelectedOut = function (selected)
                      $oselected[] = Array.from(selected)
                  end
